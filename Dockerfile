@@ -22,7 +22,7 @@ ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/shiftyar ./cmd/server
 
 # ---- runtime ----
-FROM alpine:3.22
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates wget \
  && adduser -D -H -u 10001 shiftyar \
  && mkdir -p /data && chown shiftyar /data
