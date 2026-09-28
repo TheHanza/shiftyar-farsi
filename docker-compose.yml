@@ -1,0 +1,19 @@
+# Quick start: a single container with SQLite.
+#   ADMIN_PASSWORD=choose-a-password docker compose up --build
+# then open http://localhost:8080 and sign in as "admin".
+services:
+  app:
+    build: .
+    image: shiftyar:local
+    ports:
+      - "8080:8080"
+    environment:
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD (8+ characters)}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+    volumes:
+      - shiftyar-data:/data
+    restart: unless-stopped
+
+volumes:
+  shiftyar-data:

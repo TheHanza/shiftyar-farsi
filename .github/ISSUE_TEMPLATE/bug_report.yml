@@ -1,0 +1,29 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Log in as an employee
+        2. Add a shift from 22:00 to 02:00
+        3. ...
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The "version" field from /api/health, or the commit you run.
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options: [Phone, Desktop, Both]

@@ -1,0 +1,11 @@
+{
+  "name": "شیفت‌یار",
+  "short_name": "شیفت‌یار",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [{ "src": "/icon.png", "sizes": "350x350", "type": "image/png" }]
+}

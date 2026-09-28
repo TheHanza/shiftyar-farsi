@@ -1,0 +1,53 @@
+# Production stack: app + PostgreSQL. Used by deploy/deploy.sh; values come
+# from the server's /opt/shiftyar/.env (created on first deploy).
+name: shiftyar
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shiftyar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: shiftyar
+      TZ: Asia/Tehran
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shiftyar -d shiftyar"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+
+  app:
+    image: ${SHIFTYAR_IMAGE:-shiftyar:current}
+    build:
+      context: ..
+      args:
+        VERSION: ${SHIFTYAR_VERSION:-dev}
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_DRIVER: postgres
+      DB_DSN: host=postgres user=shiftyar password=${POSTGRES_PASSWORD} dbname=shiftyar port=5432 sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-مدیر}
+    ports:
+      # Only reachable through the host's nginx.
+      - "127.0.0.1:${APP_PORT:-8090}:8080"
+    networks: [internal]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  pgdata:
+
+networks:
+  internal:

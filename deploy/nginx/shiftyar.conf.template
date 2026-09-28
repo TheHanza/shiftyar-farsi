@@ -1,0 +1,57 @@
+# ShiftYar — installed by deploy/deploy.sh as /etc/nginx/sites-available/__DOMAIN__
+# Re-running `deploy.sh nginx` regenerates this file; edit the template instead.
+#
+# Works directly or behind Cloudflare (SSL mode "Full"): the HTTPS block
+# exists from the start (self-signed until `deploy.sh tls` swaps in a Let's
+# Encrypt certificate), and ACME challenges are answered on both ports so
+# validation succeeds even when Cloudflare redirects HTTP to HTTPS.
+
+# Behind Cloudflare the real client IP arrives in CF-Connecting-IP.
+map $http_cf_connecting_ip $shiftyar_client_ip {
+    ""      $remote_addr;
+    default $http_cf_connecting_ip;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __DOMAIN__;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name __DOMAIN__;
+
+    ssl_certificate     __CERT__;
+    ssl_certificate_key __KEY__;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:shiftyar_ssl:10m;
+
+    client_max_body_size 2m;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header X-Frame-Options DENY always;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:__PORT__;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $shiftyar_client_ip;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 60s;
+    }
+}

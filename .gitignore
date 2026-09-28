@@ -1,0 +1,28 @@
+# dependencies & builds
+node_modules/
+frontend/dist/
+backend/bin/
+*.tsbuildinfo
+
+# local data
+backend/data/
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# secrets
+.env
+.env.*
+!.env.example
+deploy/deploy.env
+
+# editors & OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
