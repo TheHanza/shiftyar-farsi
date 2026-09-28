@@ -9,7 +9,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---- backend ----
-FROM golang:1.26-alpine AS api
+FROM golang:1.27-alpine AS api
 # Override where proxy.golang.org is unreachable (e.g. GOPROXY=https://goproxy.cn,direct).
 # Modules are still verified against go.sum, so a mirror cannot alter them.
 ARG GOPROXY=https://proxy.golang.org,direct
