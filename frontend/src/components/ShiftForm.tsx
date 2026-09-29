@@ -78,7 +78,7 @@ export default function ShiftForm({ open, onOpenChange, shift, asAdmin, defaultD
       return shift ? shiftApi.update(shift.id, body) : shiftApi.create(body);
     },
     {
-      success: shift ? "شیفت به‌روز شد ✨" : me?.settings.requireApproval && !asAdmin ? "ثبت شد! منتظر تایید مدیر بمون 🙌" : "ثبت شد! 🙌",
+      success: shift ? (asAdmin ? "شیفت به‌روز شد ✨" : "ویرایش ثبت شد؛ منتظر تایید مدیر بمون 🙌") : me?.settings.requireApproval && !asAdmin ? "ثبت شد! منتظر تایید مدیر بمون 🙌" : "ثبت شد! 🙌",
       onSuccess: () => onOpenChange(false),
     },
   );
@@ -238,13 +238,16 @@ export default function ShiftForm({ open, onOpenChange, shift, asAdmin, defaultD
           <textarea className="field h-auto min-h-20 py-2.5" value={note} onChange={(ev) => setNote(ev.target.value)} maxLength={500} placeholder="مثلاً: جای علی وایسادم" />
         </label>
 
+        {shift && !asAdmin && (
+          <div className="rounded-xl bg-background px-3 py-2 text-xs text-muted">✏️ بعد از ویرایش، شیفت دوباره می‌ره برای تایید مدیر.</div>
+        )}
         {shift?.reviewNote && <div className="rounded-xl bg-amber-soft px-3 py-2 text-xs text-amber">💬 {shift.reviewNote}</div>}
 
         <div className="flex gap-2">
           <button type="submit" className="btn btn-primary h-12 flex-1 text-base" disabled={save.isPending || minutes === 0 || (asAdmin && !shift && !userId)}>
             {shift ? "ذخیره تغییرات" : "ثبت کن"}
           </button>
-          {shift && (
+          {shift && (asAdmin || !(shift.status === "approved" && shift.reviewedById)) && (
             <button
               type="button"
               className={cn("btn h-12", confirmDelete && "btn-danger")}

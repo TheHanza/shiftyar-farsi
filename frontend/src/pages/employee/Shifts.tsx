@@ -17,7 +17,7 @@ export function groupByDate(shifts: Shift[]) {
 /** Opens an employee's own shift for editing, or explains why it can't be edited. */
 export function editOwnShift(sh: Shift, edit: (s: Shift) => void) {
   if (!sh.end) return toast.info("این شیفت هنوز در جریانه");
-  if (!sh.editable) return toast.info(sh.status === "approved" ? "مدیر این شیفت رو تایید کرده و قفله 🔒" : "مهلت ویرایش این شیفت تموم شده");
+  if (!sh.editable) return toast.info("مهلت ویرایش این شیفت تموم شده");
   edit(sh);
 }
 

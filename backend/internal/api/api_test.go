@@ -226,7 +226,7 @@ func TestLogo(t *testing.T) {
 	}
 }
 
-func TestAutoApprovedShiftStaysEditable(t *testing.T) {
+func TestApprovedShiftEditsNeedApproval(t *testing.T) {
 	admin, login := setup(t)
 	st := map[string]any{}
 	admin.do("GET", "/me", nil, &struct{ Settings *map[string]any }{&st})
@@ -245,13 +245,16 @@ func TestAutoApprovedShiftStaysEditable(t *testing.T) {
 	if sh.Status != "approved" || !sh.Editable {
 		t.Fatalf("auto-approved shift not editable: %+v", sh)
 	}
-	if code := sara.do("PATCH", "/shifts/"+jwtSubject(sh.ID), map[string]any{"date": day, "start": "09:00", "end": "13:00"}, &sh); code != 200 {
-		t.Fatalf("edit auto-approved shift: %d", code)
+	if code := sara.do("PATCH", "/shifts/"+jwtSubject(sh.ID), map[string]any{"date": day, "start": "09:00", "end": "13:00"}, &sh); code != 200 || sh.Status != "pending" {
+		t.Fatalf("edit auto-approved shift: %d %s", code, sh.Status)
 	}
-	// Once an admin has reviewed it, it is locked.
+	// Admin-approved shifts can be edited too, but the edit goes back to the queue.
 	admin.do("POST", "/admin/shifts/review", map[string]any{"ids": []uint{sh.ID}, "status": "approved"}, nil)
-	if code := sara.do("PATCH", "/shifts/"+jwtSubject(sh.ID), map[string]any{"date": day, "start": "09:00", "end": "14:00"}, nil); code != 403 {
-		t.Fatalf("edited an admin-approved shift: %d", code)
+	if code := sara.do("DELETE", "/shifts/"+jwtSubject(sh.ID), nil, nil); code != 403 {
+		t.Fatalf("deleted an admin-approved shift: %d", code)
+	}
+	if code := sara.do("PATCH", "/shifts/"+jwtSubject(sh.ID), map[string]any{"date": day, "start": "09:00", "end": "14:00"}, &sh); code != 200 || sh.Status != "pending" {
+		t.Fatalf("edit admin-approved shift: %d %s", code, sh.Status)
 	}
 }
 

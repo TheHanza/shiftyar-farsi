@@ -68,6 +68,7 @@ export interface Shift {
   weightedMinutes: number;
   bonusMinutes: number;
   editable: boolean;
+  reviewedById: number | null;
   user?: UserBrief;
   overlaps?: ShiftOverlap[];
 }

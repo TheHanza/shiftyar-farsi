@@ -22,8 +22,9 @@ All notable changes to this project are documented here. The format follows
   approval queue, both of them, with the overlap shown on each card. Toggle in Settings.
 
 ### Changed
-- Shifts auto-approved because approval is off stay editable by the employee within the edit
-  window; only shifts an admin reviewed are locked.
+- Employees can edit approved shifts within the edit window, and every employee edit goes back
+  to the approval queue, even when approval is turned off. Shifts an admin approved can't be
+  deleted by the employee.
 - Shift cards show whether they can be edited, and recent shifts on the home screen open for editing.
 
 ### Fixed

@@ -60,7 +60,7 @@ func (s *Server) rules() []calc.Rule {
 
 var (
 	errNotYours     = errors.New("این شیفت مال تو نیست")
-	errApproved     = errors.New("شیفت تایید شده را فقط مدیر می‌تواند تغییر دهد")
+	errApproved     = errors.New("شیفت تایید شده را فقط مدیر می‌تواند حذف کند")
 	errWindowClosed = errors.New("مهلت ویرایش این شیفت تمام شده است")
 )
 
@@ -70,10 +70,6 @@ func (s *Server) canModify(u models.User, sh models.Shift, st models.Settings) e
 	}
 	if sh.UserID != u.ID {
 		return errNotYours
-	}
-	if sh.Status == models.StatusApproved && (st.RequireApproval || sh.ReviewedByID != nil || sh.CreatedByID != sh.UserID) {
-		// Shifts that were auto-approved (approval turned off) stay editable.
-		return errApproved
 	}
 	if st.EditWindowDays > 0 && time.Since(sh.Start) > time.Duration(st.EditWindowDays)*24*time.Hour {
 		return errWindowClosed
@@ -370,12 +366,9 @@ func (s *Server) updateShift(c *gin.Context) {
 	}
 	sh.Start, sh.End, sh.ChannelID, sh.Note = start, &end, in.ChannelID, strings.TrimSpace(in.Note)
 	if !u.IsAdmin() {
-		if st.RequireApproval || sh.Status == models.StatusRejected {
-			sh.Status, sh.ReviewNote = models.StatusPending, ""
-		} else {
-			sh.Status = models.StatusApproved
-		}
-		s.flagOverlaps(&sh, st)
+		// Employee edits always go back to an admin, even with approval turned off.
+		sh.Status, sh.ReviewNote, sh.ReviewedByID = models.StatusPending, "", nil
+		s.flagOverlaps(&sh, st) // also sends a teammate's overlapping shift to the queue
 	}
 	s.db.Save(&sh)
 	c.JSON(http.StatusOK, s.view(sh, st, loc, s.rules(), u))
@@ -390,6 +383,10 @@ func (s *Server) deleteShift(c *gin.Context) {
 	}
 	if err := s.canModify(u, sh, s.settings()); err != nil {
 		fail(c, http.StatusForbidden, err.Error())
+		return
+	}
+	if !u.IsAdmin() && sh.Status == models.StatusApproved && sh.ReviewedByID != nil {
+		fail(c, http.StatusForbidden, errApproved.Error())
 		return
 	}
 	s.db.Delete(&sh)
