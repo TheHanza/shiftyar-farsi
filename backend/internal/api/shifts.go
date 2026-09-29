@@ -25,7 +25,20 @@ type shiftView struct {
 	BonusMinutes    int        `json:"bonusMinutes"`
 	Editable        bool       `json:"editable"`
 	User            *userBrief `json:"user,omitempty"`
+	Overlaps        []overlap  `json:"overlaps,omitempty"`
 }
+
+// overlap is a teammate's shift on the same team that runs at the same time.
+type overlap struct {
+	ShiftID   uint      `json:"shiftId"`
+	User      userBrief `json:"user"`
+	StartTime string    `json:"startTime"`
+	EndTime   string    `json:"endTime"`
+	Minutes   int       `json:"minutes"`
+}
+
+// overlapGrace ignores short hand-over overlaps between consecutive shifts.
+const overlapGrace = 15 * time.Minute
 
 func (s *Server) view(sh models.Shift, st models.Settings, loc *time.Location, rules []calc.Rule, viewer models.User) shiftView {
 	v := shiftView{Shift: sh, Date: sh.Start.In(loc).Format("2006-01-02"), StartTime: sh.Start.In(loc).Format("15:04")}
@@ -58,7 +71,8 @@ func (s *Server) canModify(u models.User, sh models.Shift, st models.Settings) e
 	if sh.UserID != u.ID {
 		return errNotYours
 	}
-	if sh.Status == models.StatusApproved {
+	if sh.Status == models.StatusApproved && (st.RequireApproval || sh.ReviewedByID != nil || sh.CreatedByID != sh.UserID) {
+		// Shifts that were auto-approved (approval turned off) stay editable.
 		return errApproved
 	}
 	if st.EditWindowDays > 0 && time.Since(sh.Start) > time.Duration(st.EditWindowDays)*24*time.Hour {
@@ -101,6 +115,7 @@ func (s *Server) listShifts(c *gin.Context) {
 	}
 	users := s.userMap()
 	rules := s.rules()
+	overlaps := s.overlapsOf(shifts, users, loc)
 	out := make([]shiftView, 0, len(shifts))
 	for _, sh := range shifts {
 		v := s.view(sh, st, loc, rules, u)
@@ -108,9 +123,96 @@ func (s *Server) listShifts(c *gin.Context) {
 			b := brief(ou)
 			v.User = &b
 		}
+		v.Overlaps = overlaps[sh.ID]
 		out = append(out, v)
 	}
 	c.JSON(http.StatusOK, out)
+}
+
+func shiftEnd(sh models.Shift, now time.Time) time.Time {
+	if sh.End != nil {
+		return *sh.End
+	}
+	return now
+}
+
+func sameTeam(a, b *uint) bool { return a == nil || b == nil || *a == *b }
+
+// overlapMinutes is how long two shifts of different people on the same team
+// ran at the same time, or 0 when that is within the hand-over grace.
+func overlapMinutes(a, b models.Shift, now time.Time) int {
+	if a.UserID == b.UserID || a.Status == models.StatusRejected || b.Status == models.StatusRejected || !sameTeam(a.ChannelID, b.ChannelID) {
+		return 0
+	}
+	from, to := a.Start, shiftEnd(a, now)
+	if b.Start.After(from) {
+		from = b.Start
+	}
+	if e := shiftEnd(b, now); e.Before(to) {
+		to = e
+	}
+	if to.Sub(from) < overlapGrace {
+		return 0
+	}
+	return int(to.Sub(from).Minutes())
+}
+
+// overlapsOf finds, for each shift, teammates' shifts that ran at the same time.
+func (s *Server) overlapsOf(shifts []models.Shift, users map[uint]models.User, loc *time.Location) map[uint][]overlap {
+	out := map[uint][]overlap{}
+	if len(shifts) == 0 {
+		return out
+	}
+	now := time.Now()
+	from, to := shifts[0].Start, shiftEnd(shifts[0], now)
+	for _, sh := range shifts {
+		if sh.Start.Before(from) {
+			from = sh.Start
+		}
+		if e := shiftEnd(sh, now); e.After(to) {
+			to = e
+		}
+	}
+	var others []models.Shift
+	s.db.Where("status <> ? AND start < ? AND (\"end\" IS NULL OR \"end\" > ?)", models.StatusRejected, to, from).Find(&others)
+	for _, sh := range shifts {
+		for _, o := range others {
+			if m := overlapMinutes(sh, o, now); m > 0 {
+				ov := overlap{ShiftID: o.ID, User: brief(users[o.UserID]), StartTime: o.Start.In(loc).Format("15:04"), Minutes: m}
+				if o.End != nil {
+					ov.EndTime = o.End.In(loc).Format("15:04")
+				}
+				out[sh.ID] = append(out[sh.ID], ov)
+			}
+		}
+	}
+	return out
+}
+
+// flagOverlaps sends a shift that ran at the same time as a teammate's on the
+// same team to the approval queue, together with the teammate's shifts that no
+// admin has reviewed yet, so an admin decides who actually worked.
+func (s *Server) flagOverlaps(sh *models.Shift, st models.Settings) {
+	if sh.End == nil || !st.FlagOverlaps {
+		return // checked again on clock-out
+	}
+	var others []models.Shift
+	s.db.Where("user_id <> ? AND status <> ? AND start < ? AND (\"end\" IS NULL OR \"end\" > ?)",
+		sh.UserID, models.StatusRejected, *sh.End, sh.Start).Find(&others)
+	now := time.Now()
+	var reopen []uint
+	for _, o := range others {
+		if overlapMinutes(*sh, o, now) == 0 {
+			continue
+		}
+		sh.Status = models.StatusPending
+		if o.Status == models.StatusApproved && o.ReviewedByID == nil && o.CreatedByID == o.UserID {
+			reopen = append(reopen, o.ID)
+		}
+	}
+	if len(reopen) > 0 {
+		s.db.Model(&models.Shift{}).Where("id IN ?", reopen).Update("status", models.StatusPending)
+	}
 }
 
 func (s *Server) userMap() map[uint]models.User {
@@ -220,6 +322,11 @@ func (s *Server) createShift(c *gin.Context) {
 	}
 	sh := models.Shift{UserID: userID, ChannelID: in.ChannelID, Start: start, End: &end,
 		Note: strings.TrimSpace(in.Note), Status: status, CreatedByID: u.ID}
+	if u.IsAdmin() {
+		sh.ReviewedByID = &u.ID
+	} else {
+		s.flagOverlaps(&sh, st)
+	}
 	if err := s.db.Create(&sh).Error; err != nil {
 		fail(c, http.StatusInternalServerError, "خطای داخلی")
 		return
@@ -262,8 +369,13 @@ func (s *Server) updateShift(c *gin.Context) {
 		return
 	}
 	sh.Start, sh.End, sh.ChannelID, sh.Note = start, &end, in.ChannelID, strings.TrimSpace(in.Note)
-	if !u.IsAdmin() && st.RequireApproval {
-		sh.Status, sh.ReviewNote = models.StatusPending, ""
+	if !u.IsAdmin() {
+		if st.RequireApproval || sh.Status == models.StatusRejected {
+			sh.Status, sh.ReviewNote = models.StatusPending, ""
+		} else {
+			sh.Status = models.StatusApproved
+		}
+		s.flagOverlaps(&sh, st)
 	}
 	s.db.Save(&sh)
 	c.JSON(http.StatusOK, s.view(sh, st, loc, s.rules(), u))
@@ -362,6 +474,9 @@ func (s *Server) clockOut(c *gin.Context) {
 	sh.End = &end
 	if n := strings.TrimSpace(in.Note); n != "" {
 		sh.Note = n
+	}
+	if !u.IsAdmin() {
+		s.flagOverlaps(sh, st)
 	}
 	s.db.Save(sh)
 	c.JSON(http.StatusOK, s.view(*sh, st, s.location(st), s.rules(), u))

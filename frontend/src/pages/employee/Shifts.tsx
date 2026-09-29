@@ -14,6 +14,13 @@ export function groupByDate(shifts: Shift[]) {
   return [...groups.entries()];
 }
 
+/** Opens an employee's own shift for editing, or explains why it can't be edited. */
+export function editOwnShift(sh: Shift, edit: (s: Shift) => void) {
+  if (!sh.end) return toast.info("این شیفت هنوز در جریانه");
+  if (!sh.editable) return toast.info(sh.status === "approved" ? "مدیر این شیفت رو تایید کرده و قفله 🔒" : "مهلت ویرایش این شیفت تموم شده");
+  edit(sh);
+}
+
 export default function MyShifts() {
   const { data: me } = useMe();
   const [offset, setOffset] = useState(0);
@@ -49,12 +56,13 @@ export default function MyShifts() {
                     key={sh.id}
                     shift={sh}
                     channels={me.channels}
-                    onClick={() => {
-                      if (!sh.end) return toast.info("این شیفت هنوز در جریانه");
-                      if (!sh.editable) return toast.info(sh.status === "approved" ? "شیفت تایید شده قفله 🔒" : "مهلت ویرایش این شیفت تموم شده");
-                      setEditing(sh);
-                      setOpen(true);
-                    }}
+                    showEditHint
+                    onClick={() =>
+                      editOwnShift(sh, (s) => {
+                        setEditing(s);
+                        setOpen(true);
+                      })
+                    }
                   />
                 ))}
               </div>

@@ -45,14 +45,14 @@ func Open(cfg config.Config) (*gorm.DB, error) {
 
 // Migrate creates tables and seeds defaults on first run.
 func Migrate(db *gorm.DB, cfg config.Config) error {
-	if err := db.AutoMigrate(&models.User{}, &models.Channel{}, &models.Shift{}, &models.RateRule{}, &models.Adjustment{}, &models.Settings{}, &models.Asset{}); err != nil {
+	if err := db.AutoMigrate(&models.User{}, &models.Channel{}, &models.Shift{}, &models.RateRule{}, &models.Adjustment{}, &models.Settings{}, &models.Asset{}, &models.Plan{}, &models.CoverRequest{}); err != nil {
 		return err
 	}
 
 	var s models.Settings
 	if err := db.First(&s, 1).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		s = models.Settings{ID: 1, CompanyName: "بازی دیجیتال", Calendar: models.CalendarGregorian, Timezone: "Asia/Tehran",
-			Currency: "تومان", RequireApproval: true, EditWindowDays: 3, MaxShiftHours: 16, ShowLeaderboard: true}
+			Currency: "تومان", RequireApproval: true, EditWindowDays: 3, MaxShiftHours: 16, ShowLeaderboard: true, FlagOverlaps: true}
 		if err := db.Create(&s).Error; err != nil {
 			return err
 		}

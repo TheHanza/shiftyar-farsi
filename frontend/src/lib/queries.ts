@@ -8,12 +8,15 @@ import type {
   LiveResponse,
   MeResponse,
   PeriodKind,
+  Plan,
+  PlanItem,
   RateRule,
   Settings,
   Shift,
   ShiftStatus,
   Summary,
   User,
+  UserBrief,
 } from "./types";
 import { toast } from "@/stores/toast";
 
@@ -57,6 +60,20 @@ export const useReport = (period: PeriodKind, offset: number) =>
     queryFn: () => api<{ period: Summary["period"]; rows: Summary[] }>(`/admin/report${qs({ period, offset })}`),
   });
 
+export const usePlan = (days = 14, from?: string, enabled = true) =>
+  useQuery({
+    queryKey: ["plan", days, from],
+    queryFn: () => api<{ from: string; days: number; items: PlanItem[] }>(`/plan${qs({ days, from })}`),
+    refetchInterval: 60_000,
+    enabled,
+  });
+
+export const usePlans = () => useQuery({ queryKey: ["plans"], queryFn: () => api<Plan[]>("/admin/plans") });
+
+/** Lightweight list of teammates (name and avatar) for picking a cover; employees can't read /admin/users. */
+export const useTeammates = () =>
+  useQuery({ queryKey: ["teammates"], queryFn: () => api<UserBrief[]>("/team") });
+
 export const useUsers = (enabled = true) =>
   useQuery({ queryKey: ["users"], queryFn: () => api<User[]>("/admin/users"), enabled });
 export const useRules = () => useQuery({ queryKey: ["rules"], queryFn: () => api<RateRule[]>("/admin/rules") });
@@ -77,7 +94,7 @@ export function useAction<TVars, TResult = unknown>(
   return useMutation({
     mutationFn: fn,
     onSuccess: (r) => {
-      const keys = opts.invalidate ?? ["shifts", "summary", "active", "coverage", "leaderboard", "live", "report"];
+      const keys = opts.invalidate ?? ["shifts", "summary", "active", "coverage", "leaderboard", "live", "report", "plan"];
       keys.forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
       if (opts.success) toast.success(opts.success);
       opts.onSuccess?.(r);
@@ -106,4 +123,15 @@ export const adminApi = {
   saveSettings: (body: Settings) => api<Settings>("/admin/settings", { method: "PUT", json: body }),
   addAdjustment: (body: object) => api<Adjustment>("/admin/adjustments", { json: body }),
   deleteAdjustment: (id: number) => api<void>(`/admin/adjustments/${id}`, { method: "DELETE" }),
+};
+
+export const planApi = {
+  save: (id: number | null, body: object) =>
+    id ? api<Plan>(`/admin/plans/${id}`, { method: "PATCH", json: body }) : api<Plan>("/admin/plans", { json: body }),
+  remove: (id: number) => api<void>(`/admin/plans/${id}`, { method: "DELETE" }),
+  requestCover: (body: { planId: number; date: string; targetId?: number | null; coverId?: number | null; note?: string }) =>
+    api("/plan/covers", { json: body }),
+  accept: (id: number) => api<void>(`/plan/covers/${id}/accept`, { method: "POST" }),
+  decline: (id: number) => api<void>(`/plan/covers/${id}/decline`, { method: "POST" }),
+  cancel: (id: number) => api<void>(`/plan/covers/${id}/cancel`, { method: "POST" }),
 };

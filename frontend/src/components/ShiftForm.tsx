@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Moon, Trash2 } from "lucide-react";
+import { CalendarCheck, CalendarDays, Moon, Trash2 } from "lucide-react";
 import { Sheet } from "./ui";
 import { cn } from "@/lib/cn";
 import { addDays, bonusMinutes, dayLabel, duration, fa, hmToMin, isoDay, relativeDay, weekdayShort, fmtDate } from "@/lib/format";
-import { shiftApi, useAction, useMe, useShifts, useUsers } from "@/lib/queries";
+import { shiftApi, useAction, useMe, usePlan, useShifts, useUsers } from "@/lib/queries";
 import type { Shift } from "@/lib/types";
 
 interface Props {
@@ -20,6 +20,9 @@ export default function ShiftForm({ open, onOpenChange, shift, asAdmin, defaultD
   const channels = (me?.channels ?? []).filter((c) => c.active || c.id === shift?.channelId);
   const { data: users } = useUsers(!!asAdmin);
   const { data: recent } = useShifts({ limit: 30, userId: asAdmin ? undefined : me?.user.id });
+  const days = Array.from({ length: 7 }, (_, i) => isoDay(addDays(new Date(), -i)));
+  // The past week of the plan, so a planned shift can be logged in one tap.
+  const { data: plan } = usePlan(7, days[6], open && !asAdmin);
 
   const [userId, setUserId] = useState<number>(0);
   const [date, setDate] = useState(isoDay(new Date()));
@@ -66,7 +69,9 @@ export default function ShiftForm({ open, onOpenChange, shift, asAdmin, defaultD
   const minutes = overnight ? 1440 - s + e : e - s;
   const nightMinutes = useMemo(() => bonusMinutes(date, s, minutes, me?.rules ?? []), [date, s, minutes, me?.rules]);
 
-  const days = Array.from({ length: 7 }, (_, i) => isoDay(addDays(new Date(), -i)));
+  const myPlan = plan?.items.filter((i) => i.date === date && i.assignee.id === me?.user.id) ?? [];
+  const windowDays = me?.settings.editWindowDays ?? 0;
+  const minDate = !asAdmin && windowDays > 0 ? isoDay(addDays(new Date(), -windowDays)) : undefined;
   const save = useAction(
     () => {
       const body = { date, start, end, channelId, note, ...(asAdmin && userId ? { userId } : {}) };
@@ -130,17 +135,27 @@ export default function ShiftForm({ open, onOpenChange, shift, asAdmin, defaultD
               )}
             >
               <CalendarDays size={18} />
-              <span className="mt-0.5 text-[0.65rem]">روز دیگه</span>
+              <span className="mt-0.5 text-[0.65rem]">{days.includes(date) ? "روز دیگه" : fmtDate(cal, date, { day: "numeric", month: "short" })}</span>
               <input
                 type="date"
-                className="absolute inset-0 opacity-0"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 value={date}
+                min={minDate}
                 max={asAdmin ? undefined : isoDay(new Date())}
+                // Tapping an invisible date input doesn't open the picker in every browser.
+                onClick={(ev) => {
+                  try {
+                    ev.currentTarget.showPicker();
+                  } catch {
+                    /* unsupported or already open */
+                  }
+                }}
                 onChange={(ev) => ev.target.value && setDate(ev.target.value)}
               />
             </label>
           </div>
           <div className="mt-1.5 text-xs text-muted">{relativeDay(cal, date) === "امروز" || relativeDay(cal, date) === "دیروز" ? dayLabel(cal, date) : relativeDay(cal, date)}</div>
+          {minDate && <div className="mt-0.5 text-[0.7rem] text-subtle">تا {fa(windowDays)} روز قبل رو می‌تونی ثبت کنی. برای قبل‌تر به مدیر بگو.</div>}
         </div>
 
         <div>
@@ -154,9 +169,23 @@ export default function ShiftForm({ open, onOpenChange, shift, asAdmin, defaultD
               <input type="time" className="field ltr text-center text-base" value={end} onChange={(ev) => setEnd(ev.target.value)} required />
             </label>
           </div>
-          {presets.length > 0 && (
+          {(presets.length > 0 || myPlan.length > 0) && (
             <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {presets.map(([a, b]) => (
+              {myPlan.map((p) => (
+                <button
+                  type="button"
+                  key={p.planId}
+                  onClick={() => {
+                    setStart(p.startTime);
+                    setEnd(p.endTime);
+                    if (p.channelId) setChannelId(p.channelId);
+                  }}
+                  className={cn("chip border py-1", start === p.startTime && end === p.endTime ? "border-mint text-foreground" : "border-mint/40 text-mint")}
+                >
+                  <CalendarCheck size={12} /> طبق برنامه {fa(p.startTime)} تا {fa(p.endTime)}
+                </button>
+              ))}
+              {presets.filter(([a, b]) => !myPlan.some((p) => p.startTime === a && p.endTime === b)).map(([a, b]) => (
                 <button
                   type="button"
                   key={`${a}-${b}`}

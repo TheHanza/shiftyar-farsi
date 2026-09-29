@@ -10,6 +10,11 @@ const (
 	StatusApproved = "approved"
 	StatusRejected = "rejected"
 
+	CoverOpen      = "open"
+	CoverCovered   = "covered"
+	CoverDeclined  = "declined"
+	CoverCancelled = "cancelled"
+
 	CalendarGregorian = "gregorian"
 	CalendarJalali    = "jalali"
 )
@@ -42,17 +47,47 @@ type Channel struct {
 }
 
 type Shift struct {
-	ID          uint       `gorm:"primaryKey" json:"id"`
-	UserID      uint       `gorm:"index;not null" json:"userId"`
-	ChannelID   *uint      `json:"channelId"`
-	Start       time.Time  `gorm:"index;not null" json:"start"`
-	End         *time.Time `gorm:"index" json:"end"` // nil while clocked in
-	Note        string     `gorm:"size:500" json:"note"`
-	Status      string     `gorm:"size:20;index;not null" json:"status"`
-	ReviewNote  string     `gorm:"size:300" json:"reviewNote"`
-	CreatedByID uint       `json:"createdById"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	UpdatedAt   time.Time  `json:"updatedAt"`
+	ID           uint       `gorm:"primaryKey" json:"id"`
+	UserID       uint       `gorm:"index;not null" json:"userId"`
+	ChannelID    *uint      `json:"channelId"`
+	Start        time.Time  `gorm:"index;not null" json:"start"`
+	End          *time.Time `gorm:"index" json:"end"` // nil while clocked in
+	Note         string     `gorm:"size:500" json:"note"`
+	Status       string     `gorm:"size:20;index;not null" json:"status"`
+	ReviewNote   string     `gorm:"size:300" json:"reviewNote"`
+	ReviewedByID *uint      `json:"reviewedById"` // admin who approved or rejected it; nil when auto-approved
+	CreatedByID  uint       `json:"createdById"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
+}
+
+// Plan is a recurring planned shift, e.g. "Sara works 21:00-03:00 every day".
+// EndMin <= StartMin means the shift runs past midnight. Weekdays is a bitmask
+// of time.Weekday (0 = every day).
+type Plan struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	UserID    uint      `gorm:"index;not null" json:"userId"`
+	ChannelID *uint     `json:"channelId"`
+	StartMin  int       `gorm:"not null" json:"startMin"`
+	EndMin    int       `gorm:"not null" json:"endMin"`
+	Weekdays  int       `gorm:"not null" json:"weekdays"`
+	Active    bool      `gorm:"not null" json:"active"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// CoverRequest asks a teammate to take over one day of a plan. TargetID is set
+// when a specific person was asked; CoverID is whoever took it.
+type CoverRequest struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	PlanID      uint      `gorm:"index;not null" json:"planId"`
+	Date        string    `gorm:"size:10;index;not null" json:"date"` // local YYYY-MM-DD the planned shift starts on
+	RequesterID uint      `gorm:"not null" json:"requesterId"`
+	TargetID    *uint     `json:"targetId"`
+	CoverID     *uint     `json:"coverId"`
+	Status      string    `gorm:"size:20;index;not null" json:"status"`
+	Note        string    `gorm:"size:300" json:"note"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // RateRule multiplies pay for minutes that fall in [StartMin, EndMin) of the
@@ -91,7 +126,8 @@ type Settings struct {
 	EditWindowDays  int    `json:"editWindowDays"` // how long employees may edit their own shifts
 	MaxShiftHours   int    `json:"maxShiftHours"`
 	ShowLeaderboard bool   `json:"showLeaderboard"`
-	LogoVersion     int64  `json:"logoVersion"` // 0 = default logo; bumped on every upload for cache busting
+	FlagOverlaps    bool   `gorm:"default:true" json:"flagOverlaps"` // same-team shifts at the same time need approval
+	LogoVersion     int64  `json:"logoVersion"`                      // 0 = default logo; bumped on every upload for cache busting
 }
 
 // Asset stores small binary files (the company logo) in the database so they

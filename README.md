@@ -38,6 +38,7 @@ wants to use on their phones.
 - 🎯 **Weekly and monthly goal rings**, with confetti when you hit one 🎉
 - 💰 **Live earnings estimate** for the month, including night-shift bonuses
 - 🔥 **Streaks** for consecutive working days
+- 📅 **Plan**: see your planned shifts for the next two weeks; if you can't make one, ask a specific teammate or the whole team to cover it
 - 👥 **Team view**: a 24-hour coverage timeline showing who worked when, plus an optional hours leaderboard
 - 😎 Pick your emoji avatar and color
 
@@ -46,6 +47,8 @@ wants to use on their phones.
 - 📊 **Weekly and monthly payroll reports**: approved, weighted, pending and bonus hours, adjustments, and the total to pay. **CSV export** opens correctly in Excel
 - 🌙 **Pay-rate rules**: e.g. 00:00–06:00 at +10%, or Fridays at +50%. Rules can cross midnight and be limited to weekdays
 - 🎁 **Bonuses and deductions** per person per month
+- 📅 **Recurring shift plans** per person (e.g. 21:00–03:00 every day, or weekdays only), with cover requests and direct reassignment
+- 👯 **Double-booked shifts** (two people on the same team at the same time) go to the approval queue with the overlap highlighted
 - 🟥 **Coverage gaps**: see at a glance which hours nobody covered
 - 🟢 **Who's on shift now**
 - 👥 **Teams**, e.g. Website and Telegram, so you can see which team each shift was for. The API and code call these "channels"

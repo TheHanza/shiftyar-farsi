@@ -1,20 +1,25 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { BarChart3, Clock3, Home, Settings2, Users, UsersRound } from "lucide-react";
+import { BarChart3, CalendarDays, Clock3, Home, Settings2, Users, UsersRound } from "lucide-react";
 import { Avatar } from "./ui";
 import { BrandLogo, useFavicon } from "./BrandLogo";
-import { useLive, useMe } from "@/lib/queries";
+import { useLive, useMe, usePlan } from "@/lib/queries";
+import { requestsFor } from "@/pages/Plan";
 import { cn } from "@/lib/cn";
 import { fa } from "@/lib/format";
 
-const employeeNav = [
+type Badge = "pending" | "covers";
+
+const employeeNav: { to: string; label: string; icon: typeof Home; end?: boolean; badge?: Badge }[] = [
   { to: "/", label: "خانه", icon: Home, end: true },
   { to: "/shifts", label: "شیفت‌ها", icon: Clock3 },
+  { to: "/plan", label: "برنامه", icon: CalendarDays, badge: "covers" },
   { to: "/team", label: "تیم", icon: UsersRound },
 ];
 
-const adminNav = [
+const adminNav: typeof employeeNav = [
   { to: "/", label: "خانه", icon: Home, end: true },
-  { to: "/shifts", label: "شیفت‌ها", icon: Clock3, badge: true },
+  { to: "/shifts", label: "شیفت‌ها", icon: Clock3, badge: "pending" },
+  { to: "/plan", label: "برنامه", icon: CalendarDays, badge: "covers" },
   { to: "/report", label: "گزارش", icon: BarChart3 },
   { to: "/people", label: "افراد", icon: Users },
   { to: "/settings", label: "تنظیمات", icon: Settings2 },
@@ -25,6 +30,11 @@ export default function Layout() {
   const navigate = useNavigate();
   const isAdmin = me?.user.role === "admin";
   const { data: live } = useLive(isAdmin);
+  const { data: plan } = usePlan();
+  const badges: Record<Badge, number> = {
+    pending: live?.pendingCount ?? 0,
+    covers: me && plan ? requestsFor(plan.items, me.user.id).length : 0,
+  };
   const nav = isAdmin ? adminNav : employeeNav;
   useFavicon(me?.settings.logoVersion);
 
@@ -62,7 +72,7 @@ export default function Layout() {
                 to={n.to}
                 end={n.end}
                 className={({ isActive }) =>
-                  cn("relative flex min-w-14 flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[0.7rem] transition", isActive ? "text-primary" : "text-subtle hover:text-muted")
+                  cn("relative flex min-w-12 flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[0.7rem] transition", isActive ? "text-primary" : "text-subtle hover:text-muted")
                 }
               >
                 {({ isActive }) => (
@@ -71,9 +81,9 @@ export default function Layout() {
                       <n.icon size={21} strokeWidth={isActive ? 2.4 : 1.8} />
                     </span>
                     {n.label}
-                    {"badge" in n && n.badge && !!live?.pendingCount && (
+                    {n.badge && badges[n.badge] > 0 && (
                       <span className="absolute right-2 top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-amber px-1 text-[0.6rem] font-bold text-black">
-                        {fa(live.pendingCount)}
+                        {fa(badges[n.badge])}
                       </span>
                     )}
                   </>

@@ -9,7 +9,9 @@ import ClockCard from "@/components/ClockCard";
 import ShiftForm from "@/components/ShiftForm";
 import ShiftCard from "@/components/ShiftCard";
 import { Loading, SectionTitle } from "@/components/ui";
-import type { Summary } from "@/lib/types";
+import type { Shift, Summary } from "@/lib/types";
+import { editOwnShift } from "./Shifts";
+import { NextPlanCard } from "../Plan";
 
 /** Fires confetti once per period when a goal is reached. */
 function useGoalCelebration(s?: Summary) {
@@ -33,6 +35,7 @@ export default function EmployeeHome() {
   const month = useSummary("month");
   const recent = useShifts({ limit: 3 });
   const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Shift | null>(null);
   useGoalCelebration(week.data);
   useGoalCelebration(month.data);
 
@@ -60,6 +63,7 @@ export default function EmployeeHome() {
       </div>
 
       <ClockCard />
+      <NextPlanCard />
 
       <div className="card hero-gradient mt-3 flex items-center justify-around p-4">
         <GoalRing value={weekTotal} goal={w.goalMinutes} label="هدف هفته" />
@@ -113,7 +117,17 @@ export default function EmployeeHome() {
           recent.data.map((s) => (
             <div key={s.id}>
               <div className="mb-1 text-[0.7rem] text-subtle">{relativeDay(cal, s.date)}</div>
-              <ShiftCard shift={s} channels={me.channels} />
+              <ShiftCard
+                shift={s}
+                channels={me.channels}
+                showEditHint
+                onClick={() =>
+                  editOwnShift(s, (sh) => {
+                    setEditing(sh);
+                    setFormOpen(true);
+                  })
+                }
+              />
             </div>
           ))
         ) : (
@@ -122,12 +136,15 @@ export default function EmployeeHome() {
       </div>
 
       <button
-        onClick={() => setFormOpen(true)}
+        onClick={() => {
+          setEditing(null);
+          setFormOpen(true);
+        }}
         className="btn btn-primary glow fixed bottom-24 left-[max(1rem,calc(50%-24rem+1rem))] z-20 h-14 rounded-2xl px-5 text-base"
       >
         <Plus size={20} /> ثبت ساعت
       </button>
-      <ShiftForm open={formOpen} onOpenChange={setFormOpen} />
+      <ShiftForm open={formOpen} onOpenChange={setFormOpen} shift={editing} />
     </div>
   );
 }

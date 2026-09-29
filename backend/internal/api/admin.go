@@ -389,7 +389,12 @@ func (s *Server) reviewShifts(c *gin.Context) {
 		fail(c, http.StatusBadRequest, "درخواست نامعتبر است")
 		return
 	}
+	var reviewer *uint
+	if in.Status != models.StatusPending {
+		id := me(c).ID
+		reviewer = &id
+	}
 	res := s.db.Model(&models.Shift{}).Where("id IN ? AND \"end\" IS NOT NULL", in.IDs).
-		Updates(map[string]any{"status": in.Status, "review_note": strings.TrimSpace(in.Note)})
+		Updates(map[string]any{"status": in.Status, "review_note": strings.TrimSpace(in.Note), "reviewed_by_id": reviewer})
 	c.JSON(http.StatusOK, gin.H{"updated": res.RowsAffected})
 }

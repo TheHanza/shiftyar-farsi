@@ -40,6 +40,7 @@ export interface Settings {
   editWindowDays: number;
   maxShiftHours: number;
   showLeaderboard: boolean;
+  flagOverlaps: boolean;
   logoVersion: number;
 }
 
@@ -68,6 +69,50 @@ export interface Shift {
   bonusMinutes: number;
   editable: boolean;
   user?: UserBrief;
+  overlaps?: ShiftOverlap[];
+}
+
+/** A teammate's shift on the same team that ran at the same time. */
+export interface ShiftOverlap {
+  shiftId: number;
+  user: UserBrief;
+  startTime: string;
+  endTime: string;
+  minutes: number;
+}
+
+export interface Plan {
+  id: number;
+  userId: number;
+  channelId: number | null;
+  startMin: number;
+  endMin: number;
+  weekdays: number;
+  active: boolean;
+}
+
+export type CoverStatus = "open" | "covered" | "declined";
+
+export interface CoverRequest {
+  id: number;
+  status: CoverStatus;
+  note: string;
+  requester: UserBrief;
+  target: UserBrief | null;
+  cover: UserBrief | null;
+}
+
+export interface PlanItem {
+  planId: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+  minutes: number;
+  channelId: number | null;
+  owner: UserBrief;
+  assignee: UserBrief;
+  logged: boolean;
+  request: CoverRequest | null;
 }
 
 export interface Period {

@@ -1,4 +1,4 @@
-import { Moon, MessageSquare } from "lucide-react";
+import { Lock, Moon, MessageSquare, Pencil, Users } from "lucide-react";
 import { Avatar, StatusChip } from "./ui";
 import { duration, fa } from "@/lib/format";
 import type { Channel, Shift } from "@/lib/types";
@@ -11,12 +11,14 @@ export default function ShiftCard({
   onClick,
   showUser,
   leading,
+  showEditHint,
 }: {
   shift: Shift;
   channels: Channel[];
   onClick?: () => void;
   showUser?: boolean;
   leading?: ReactNode;
+  showEditHint?: boolean; // pencil when the viewer can edit it, lock when they can't
 }) {
   const ch = channels.find((c) => c.id === shift.channelId);
   const Tag = onClick ? "button" : "div";
@@ -49,8 +51,29 @@ export default function ShiftCard({
           )}
           {shift.note && <MessageSquare size={12} className="text-subtle" aria-label="یادداشت دارد" />}
         </div>
+        {!!shift.overlaps?.length && (
+          <div className="mt-1.5 text-[0.7rem] text-amber">
+            <Users size={11} className="me-1 inline" />
+            هم‌زمان با {shift.overlaps.map((o) => `${o.user.avatar} ${o.user.name} (${fa(o.startTime)} تا ${o.endTime ? fa(o.endTime) : "الان"})`).join("، ")}
+          </div>
+        )}
       </div>
-      <StatusChip status={shift.status} />
+      <div className="flex flex-col items-end gap-1.5">
+        <StatusChip status={shift.status} />
+        {showEditHint && shift.end && (
+          <span className="flex items-center gap-1 text-[0.65rem] text-subtle">
+            {shift.editable ? (
+              <>
+                <Pencil size={11} /> ویرایش
+              </>
+            ) : (
+              <>
+                <Lock size={11} /> قفل
+              </>
+            )}
+          </span>
+        )}
+      </div>
     </Tag>
   );
 }

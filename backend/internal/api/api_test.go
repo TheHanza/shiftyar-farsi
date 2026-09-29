@@ -80,7 +80,7 @@ func TestShiftLifecycle(t *testing.T) {
 		t.Fatalf("employee reached admin API: %d", code)
 	}
 
-	day := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	day := time.Now().AddDate(0, 0, -2).Format("2006-01-02")
 	var sh struct {
 		ID           uint
 		Status       string
@@ -223,5 +223,146 @@ func TestLogo(t *testing.T) {
 	admin.do("DELETE", "/admin/logo", nil, nil)
 	if code := anon.do("GET", "/logo", nil, nil); code != 404 {
 		t.Fatalf("logo still served after delete: %d", code)
+	}
+}
+
+func TestAutoApprovedShiftStaysEditable(t *testing.T) {
+	admin, login := setup(t)
+	st := map[string]any{}
+	admin.do("GET", "/me", nil, &struct{ Settings *map[string]any }{&st})
+	st["requireApproval"] = false
+	admin.do("PUT", "/admin/settings", st, nil)
+	admin.do("POST", "/admin/users", map[string]any{"name": "Sara", "username": "sara", "password": "sara1234"}, nil)
+	sara := login("sara", "sara1234")
+
+	day := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	var sh struct {
+		ID       uint
+		Status   string
+		Editable bool
+	}
+	sara.do("POST", "/shifts", map[string]any{"date": day, "start": "09:00", "end": "12:00"}, &sh)
+	if sh.Status != "approved" || !sh.Editable {
+		t.Fatalf("auto-approved shift not editable: %+v", sh)
+	}
+	if code := sara.do("PATCH", "/shifts/"+jwtSubject(sh.ID), map[string]any{"date": day, "start": "09:00", "end": "13:00"}, &sh); code != 200 {
+		t.Fatalf("edit auto-approved shift: %d", code)
+	}
+	// Once an admin has reviewed it, it is locked.
+	admin.do("POST", "/admin/shifts/review", map[string]any{"ids": []uint{sh.ID}, "status": "approved"}, nil)
+	if code := sara.do("PATCH", "/shifts/"+jwtSubject(sh.ID), map[string]any{"date": day, "start": "09:00", "end": "14:00"}, nil); code != 403 {
+		t.Fatalf("edited an admin-approved shift: %d", code)
+	}
+}
+
+func TestOverlappingShiftsNeedApproval(t *testing.T) {
+	admin, login := setup(t)
+	st := map[string]any{}
+	admin.do("GET", "/me", nil, &struct{ Settings *map[string]any }{&st})
+	st["requireApproval"] = false
+	admin.do("PUT", "/admin/settings", st, nil)
+	admin.do("POST", "/admin/users", map[string]any{"name": "Sara", "username": "sara", "password": "sara1234"}, nil)
+	admin.do("POST", "/admin/users", map[string]any{"name": "Ali", "username": "ali", "password": "ali12345"}, nil)
+	sara, ali := login("sara", "sara1234"), login("ali", "ali12345")
+	day := time.Now().AddDate(0, 0, -2).Format("2006-01-02")
+	one, two := 1, 2
+
+	type shiftRes struct {
+		ID       uint
+		Status   string
+		Overlaps []struct{ User struct{ Name string } }
+	}
+	var a, b, c shiftRes
+	sara.do("POST", "/shifts", map[string]any{"date": day, "start": "21:00", "end": "03:00", "channelId": one}, &a)
+	// A 10-minute hand-over is fine.
+	ali.do("POST", "/shifts", map[string]any{"date": day, "start": "02:50", "end": "06:00", "channelId": one}, &b)
+	if a.Status != "approved" || b.Status != "approved" {
+		t.Fatalf("hand-over flagged: %s %s", a.Status, b.Status)
+	}
+	// A different team at the same time is fine too.
+	ali.do("POST", "/shifts", map[string]any{"date": day, "start": "20:00", "end": "22:00", "channelId": two}, &c)
+	if c.Status != "approved" {
+		t.Fatalf("other team flagged: %s", c.Status)
+	}
+	ali.do("DELETE", "/shifts/"+jwtSubject(c.ID), nil, nil)
+	// Same team, same hours: both go to the queue.
+	ali.do("POST", "/shifts", map[string]any{"date": day, "start": "22:00", "end": "01:00", "channelId": one}, &c)
+	if c.Status != "pending" {
+		t.Fatalf("double shift not pending: %s", c.Status)
+	}
+	var queue []shiftRes
+	admin.do("GET", "/shifts?status=pending", nil, &queue)
+	if len(queue) != 2 {
+		t.Fatalf("queue has %d shifts, want both", len(queue))
+	}
+	for _, s := range queue {
+		if len(s.Overlaps) != 1 {
+			t.Fatalf("shift %d overlaps = %+v", s.ID, s.Overlaps)
+		}
+	}
+}
+
+func TestPlanAndCover(t *testing.T) {
+	admin, login := setup(t)
+	var sara, ali, negar struct{ ID uint }
+	admin.do("POST", "/admin/users", map[string]any{"name": "Sara", "username": "sara", "password": "sara1234"}, &sara)
+	admin.do("POST", "/admin/users", map[string]any{"name": "Ali", "username": "ali", "password": "ali12345"}, &ali)
+	admin.do("POST", "/admin/users", map[string]any{"name": "Negar", "username": "negar", "password": "negar123"}, &negar)
+	s, a, n := login("sara", "sara1234"), login("ali", "ali12345"), login("negar", "negar123")
+
+	if code := s.do("POST", "/admin/plans", map[string]any{"userId": sara.ID, "startMin": 21 * 60, "endMin": 3 * 60, "active": true}, nil); code != 403 {
+		t.Fatalf("employee created a plan: %d", code)
+	}
+	var plan struct{ ID uint }
+	if code := admin.do("POST", "/admin/plans", map[string]any{"userId": sara.ID, "startMin": 21 * 60, "endMin": 3 * 60, "active": true}, &plan); code != 201 {
+		t.Fatalf("create plan: %d", code)
+	}
+	type item struct {
+		PlanID    uint
+		Date      string
+		StartTime string
+		EndTime   string
+		Minutes   int
+		Assignee  struct{ ID uint }
+		Request   *struct {
+			ID     uint
+			Status string
+		}
+	}
+	var res struct{ Items []item }
+	s.do("GET", "/plan?days=7", nil, &res)
+	if len(res.Items) != 7 || res.Items[0].Minutes != 360 || res.Items[0].EndTime != "03:00" {
+		t.Fatalf("plan items: %+v", res.Items)
+	}
+	tomorrow := res.Items[1].Date
+
+	if code := a.do("POST", "/plan/covers", map[string]any{"planId": plan.ID, "date": tomorrow}, nil); code != 403 {
+		t.Fatalf("someone else asked for cover: %d", code)
+	}
+	var req struct{ ID uint }
+	if code := s.do("POST", "/plan/covers", map[string]any{"planId": plan.ID, "date": tomorrow, "targetId": ali.ID}, &req); code != 201 {
+		t.Fatalf("request cover: %d", code)
+	}
+	if code := s.do("POST", "/plan/covers", map[string]any{"planId": plan.ID, "date": tomorrow}, nil); code != 409 {
+		t.Fatalf("duplicate request: %d", code)
+	}
+	if code := n.do("POST", "/plan/covers/"+jwtSubject(req.ID)+"/accept", nil, nil); code != 403 {
+		t.Fatalf("non-target accepted: %d", code)
+	}
+	if code := a.do("POST", "/plan/covers/"+jwtSubject(req.ID)+"/accept", nil, nil); code != 204 {
+		t.Fatalf("accept: %d", code)
+	}
+	s.do("GET", "/plan?days=7", nil, &res)
+	if res.Items[1].Assignee.ID != ali.ID || res.Items[1].Request.Status != "covered" {
+		t.Fatalf("cover not applied: %+v", res.Items[1])
+	}
+	// Ali backs out: the request reopens for anyone.
+	a.do("POST", "/plan/covers/"+jwtSubject(req.ID)+"/cancel", nil, nil)
+	if code := n.do("POST", "/plan/covers/"+jwtSubject(req.ID)+"/accept", nil, nil); code != 204 {
+		t.Fatalf("reopened request not accepted: %d", code)
+	}
+	s.do("GET", "/plan?days=7", nil, &res)
+	if res.Items[1].Assignee.ID != negar.ID {
+		t.Fatalf("assignee = %d, want negar", res.Items[1].Assignee.ID)
 	}
 }

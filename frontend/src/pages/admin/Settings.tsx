@@ -272,6 +272,12 @@ export default function SettingsPage() {
         </div>
         <div className="divide-y divide-border">
           <Switch checked={s.requireApproval} onChange={(v) => set("requireApproval", v)} label="شیفت‌ها نیاز به تایید مدیر دارند" hint="ساعت تایید نشده در حقوق حساب نمی‌شود" />
+          <Switch
+            checked={s.flagOverlaps}
+            onChange={(v) => set("flagOverlaps", v)}
+            label="شیفت‌های هم‌زمان نیاز به تایید دارند"
+            hint="اگر دو نفر از یک تیم برای یک ساعت شیفت ثبت کنند، هر دو به صف تایید می‌روند"
+          />
           <Switch checked={s.showLeaderboard} onChange={(v) => set("showLeaderboard", v)} label="نمایش جدول پرتلاش‌ها به کارمندان" hint="فقط ساعت‌ها نمایش داده می‌شود، نه حقوق" />
         </div>
         <button className="btn btn-primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(s)}>

@@ -15,3 +15,17 @@ All notable changes to this project are documented here. The format follows
   favicon. The logo is stored in the database so it survives redeploys and is included in backups.
 - Docker image, production compose stack with PostgreSQL, and `deploy/deploy.sh` with
   backups, health checks and automatic rollback.
+- Shift planning: admins set recurring shifts per person (e.g. 21:00–03:00 every day). Anyone
+  who can't make a planned day can ask a specific teammate or the whole team to cover it, and
+  admins can reassign a day directly. Planned times show up as a one-tap preset when logging.
+- Shifts on the same team that run at the same time (overlap over 15 minutes) go to the
+  approval queue, both of them, with the overlap shown on each card. Toggle in Settings.
+
+### Changed
+- Shifts auto-approved because approval is off stay editable by the employee within the edit
+  window; only shifts an admin reviewed are locked.
+- Shift cards show whether they can be edited, and recent shifts on the home screen open for editing.
+
+### Fixed
+- The "another day" date picker didn't open in some browsers, so only the last 7 days could be logged.
+  The form now also says how far back the edit window allows.

@@ -6,6 +6,7 @@ import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import Team from "./pages/Team";
+import PlanPage from "./pages/Plan";
 import EmployeeHome from "./pages/employee/Home";
 import MyShifts from "./pages/employee/Shifts";
 import AdminHome from "./pages/admin/Home";
@@ -24,6 +25,7 @@ function Routed() {
         <Route index element={admin ? <AdminHome /> : <EmployeeHome />} />
         <Route path="shifts" element={admin ? <AdminShifts /> : <MyShifts />} />
         <Route path="team" element={<Team />} />
+        <Route path="plan" element={<PlanPage />} />
         <Route path="profile" element={<Profile />} />
         {admin && (
           <>
