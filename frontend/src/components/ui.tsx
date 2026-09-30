@@ -1,9 +1,19 @@
 import { Drawer } from "vaul";
 import { ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { useToasts } from "@/stores/toast";
 import type { ShiftStatus, UserBrief } from "@/lib/types";
+
+/**
+ * Renders fixed-position UI (action bars, floating buttons) into <body>. Pages
+ * animate in with a transform, which would otherwise make `fixed` relative to
+ * the page content instead of the screen.
+ */
+export function Floating({ children }: { children: ReactNode }) {
+  return createPortal(children, document.body);
+}
 
 /** Bottom sheet in the style of the website's vaul drawers. */
 export function Sheet({

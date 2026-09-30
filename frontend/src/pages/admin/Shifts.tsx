@@ -4,7 +4,7 @@ import { shiftApi, useAction, useMe, useShifts, useSummary, useUsers } from "@/l
 import { addDays, fa, isoDay, parseDay, periodLabel, relativeDay } from "@/lib/format";
 import ShiftCard from "@/components/ShiftCard";
 import ShiftForm from "@/components/ShiftForm";
-import { Empty, Loading, PeriodNav, Segmented, Sheet } from "@/components/ui";
+import { Empty, Floating, Loading, PeriodNav, Segmented, Sheet } from "@/components/ui";
 import { groupByDate } from "../employee/Shifts";
 import { cn } from "@/lib/cn";
 import type { Shift } from "@/lib/types";
@@ -64,14 +64,16 @@ function PendingQueue({ onEdit }: { onEdit: (s: Shift) => void }) {
           />
         ))}
       </div>
-      <div className="fixed bottom-24 left-1/2 z-20 flex w-[calc(100%-2rem)] max-w-[46rem] -translate-x-1/2 gap-2 rounded-2xl border border-border bg-popover/95 p-2 backdrop-blur">
-        <button className="btn btn-primary h-11 flex-1" disabled={review.isPending} onClick={() => review.mutate({ ids, status: "approved" })}>
-          <Check size={18} /> تایید {selected.size ? `${fa(selected.size)} مورد` : "همه"}
-        </button>
-        <button className="btn h-11" disabled={review.isPending} onClick={() => setRejecting(true)}>
-          <X size={18} /> رد
-        </button>
-      </div>
+      <Floating>
+        <div className="fixed bottom-24 left-1/2 z-20 flex w-[calc(100%-2rem)] max-w-[46rem] -translate-x-1/2 gap-2 rounded-2xl border border-border bg-popover/95 p-2 backdrop-blur">
+          <button className="btn btn-primary h-11 flex-1" disabled={review.isPending} onClick={() => review.mutate({ ids, status: "approved" })}>
+            <Check size={18} /> تایید {selected.size ? `${fa(selected.size)} مورد` : "همه"}
+          </button>
+          <button className="btn h-11" disabled={review.isPending} onClick={() => setRejecting(true)}>
+            <X size={18} /> رد
+          </button>
+        </div>
+      </Floating>
       <Sheet open={rejecting} onOpenChange={setRejecting} title={`رد ${fa(ids.length)} شیفت`}>
         <textarea className="field h-auto min-h-24 py-2.5" placeholder="دلیل (به کارمند نشون داده می‌شه)" value={note} onChange={(e) => setNote(e.target.value)} />
         <button className="btn btn-danger mt-4 h-12 w-full" onClick={() => review.mutate({ ids, status: "rejected", note })}>

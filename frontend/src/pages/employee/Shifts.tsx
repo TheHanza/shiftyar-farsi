@@ -4,7 +4,7 @@ import { useMe, useShifts, useSummary } from "@/lib/queries";
 import { addDays, hm, isoDay, money, parseDay, periodLabel, relativeDay } from "@/lib/format";
 import ShiftForm from "@/components/ShiftForm";
 import ShiftCard from "@/components/ShiftCard";
-import { Empty, Loading, PeriodNav, Stat } from "@/components/ui";
+import { Empty, Floating, Loading, PeriodNav, Stat } from "@/components/ui";
 import { toast } from "@/stores/toast";
 import type { Shift } from "@/lib/types";
 
@@ -73,16 +73,18 @@ export default function MyShifts() {
         )}
       </div>
 
-      <button
-        onClick={() => {
-          setEditing(null);
-          setOpen(true);
-        }}
-        className="btn btn-primary glow fixed bottom-24 left-[max(1rem,calc(50%-24rem+1rem))] z-20 h-14 w-14 rounded-2xl px-0"
-        aria-label="ثبت ساعت"
-      >
-        <Plus size={24} />
-      </button>
+      <Floating>
+        <button
+          onClick={() => {
+            setEditing(null);
+            setOpen(true);
+          }}
+          className="btn btn-primary glow fixed bottom-24 left-[max(1rem,calc(50%-24rem+1rem))] z-20 h-14 w-14 rounded-2xl px-0"
+          aria-label="ثبت ساعت"
+        >
+          <Plus size={24} />
+        </button>
+      </Floating>
       <ShiftForm open={open} onOpenChange={setOpen} shift={editing} />
     </div>
   );

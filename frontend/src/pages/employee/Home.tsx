@@ -8,7 +8,7 @@ import { GoalRing, DayBars } from "@/components/charts";
 import ClockCard from "@/components/ClockCard";
 import ShiftForm from "@/components/ShiftForm";
 import ShiftCard from "@/components/ShiftCard";
-import { Loading, SectionTitle } from "@/components/ui";
+import { Floating, Loading, SectionTitle } from "@/components/ui";
 import type { Shift, Summary } from "@/lib/types";
 import { editOwnShift } from "./Shifts";
 import { NextPlanCard } from "../Plan";
@@ -135,15 +135,17 @@ export default function EmployeeHome() {
         )}
       </div>
 
-      <button
-        onClick={() => {
-          setEditing(null);
-          setFormOpen(true);
-        }}
-        className="btn btn-primary glow fixed bottom-24 left-[max(1rem,calc(50%-24rem+1rem))] z-20 h-14 rounded-2xl px-5 text-base"
-      >
-        <Plus size={20} /> ثبت ساعت
-      </button>
+      <Floating>
+        <button
+          onClick={() => {
+            setEditing(null);
+            setFormOpen(true);
+          }}
+          className="btn btn-primary glow fixed bottom-24 left-[max(1rem,calc(50%-24rem+1rem))] z-20 h-14 rounded-2xl px-5 text-base"
+        >
+          <Plus size={20} /> ثبت ساعت
+        </button>
+      </Floating>
       <ShiftForm open={formOpen} onOpenChange={setFormOpen} shift={editing} />
     </div>
   );
